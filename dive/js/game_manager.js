@@ -24,11 +24,11 @@ GameManager.prototype.setup = function () {
 
   var select = document.gameModeForm.gameModeSelect;
   this.gameMode     = +(select.options[select.selectedIndex].value);
-  this.tileTypes = [2,3,5,7];
+  this.tileTypes = [new Value(0,1),3,5,7];
   if (this.gameMode & 1) {
-    this.tileTypes = [2];
+    this.tileTypes = [new Value(0,1)];
     this.actuator.updateCurrentlyUnlocked(this.tileTypes);
-    this.tilesSeen = [2];
+    this.tilesSeen = [new Value(0,1)];
   } 
 
   this.score        = 0;
@@ -69,10 +69,10 @@ GameManager.prototype.actuate = function () {
   }
 
   this.actuator.actuate(this.grid, {
-    score:     this.score,
+    score:     parseInt(this.score),
     over:      this.over,
     won:       this.won,
-    bestScore: this.scoreManager.get()
+    bestScore: parseInt(this.scoreManager.get())
   });
 
 };
@@ -131,7 +131,7 @@ GameManager.prototype.move = function (direction) {
         var next      = self.grid.cellContent(positions.next);
 
         // Only one merger per row traversal?
-        if (next && self.div(next.value, tile.value) > 0 && !next.mergedFrom) {
+        if (next && self.divable(next.value, tile.value) && !next.mergedFrom) {
           var merged = new Tile(positions.next, self.div(next.value, tile.value));
           merged.mergedFrom = [tile, next];
 
@@ -142,7 +142,7 @@ GameManager.prototype.move = function (direction) {
           tile.updatePosition(positions.next);
 
           // Update the score
-          self.score += Math.min(next.value, tile.value);
+          self.score += Math.min(next.value.score(), tile.value.score());
 
           // Unlock new primes, if in that mode
           if (self.gameMode & 1) {
@@ -163,9 +163,9 @@ GameManager.prototype.move = function (direction) {
   if (self.gameMode & 1) {
     // remove duplicates
     if (newPrimes.length >= 2) {
-      newPrimes.sort(function (a,b){return a-b});
+      newPrimes.sort(function (a,b){return a.number()-b.number()});
       for (var i = newPrimes.length - 2; i >= 0; i--)
-        if (newPrimes[i] == newPrimes[i+1])
+        if (newPrimes[i].equals(newPrimes[i+1]))
           newPrimes.splice(i,1);
     }        
     self.tileTypes = self.tileTypes.concat(newPrimes);
@@ -175,13 +175,13 @@ GameManager.prototype.move = function (direction) {
     if ((self.gameMode & 1) && newPrimes.length) {
       // in mode 1, score for unlocking
       if ((self.gameMode & 3) == 1) {
-        self.score += newPrimes.reduce(function(x,y){return x+y});
+        self.score += newPrimes.reduce(function(x,y){return x+y.score()},0);
       }
 
       self.tilesSeen.push.apply(self.tilesSeen, newPrimes);
 
       var verb = " unlocked!";
-      if (newPrimes.filter(function(x){return x > ominosityBound}).length)
+      if (newPrimes.filter(function(x){return x.number() > ominosityBound}).length)
         verb = " unleashed!";
       var list = String(newPrimes.pop());
       if (newPrimes.length) {
@@ -203,7 +203,7 @@ GameManager.prototype.move = function (direction) {
           tile = self.grid.cellContent(cell);
           if (tile) {
             for(var i = 0; i < self.tileTypes.length; i++) {
-              if (tile.value % self.tileTypes[i] == 0)
+              if (tile.value.mod(self.tileTypes[i]))
                 eliminatedIndices[i] = null;
             }
           }
@@ -213,10 +213,10 @@ GameManager.prototype.move = function (direction) {
       eliminatedIndices = eliminatedIndices.filter(function (x) {return x != null});
       if (eliminatedIndices.length) {
         var eliminatedPrimes = eliminatedIndices.map(function (x) {return self.tileTypes[x]});
-        self.score += eliminatedPrimes.reduce(function(x,y){return x+y});
+        self.score += eliminatedPrimes.reduce(function(x,y){return x+y.score()},0);
 
         var verb = " eliminated!"
-        if (eliminatedPrimes.filter(function(x){return x > ominosityBound}).length)
+        if (eliminatedPrimes.filter(function(x){return x.number() > ominosityBound}).length)
           verb = " vanquished!";
         var list = String(eliminatedPrimes.pop());
         if (eliminatedPrimes.length) {
@@ -246,27 +246,36 @@ GameManager.prototype.move = function (direction) {
 };
 
 GameManager.prototype.div = function (next, cur) {
-  if ((next % cur === 0) || (cur % next === 0))
-    return next + cur
+  if (next.mod(cur) || cur.mod(next))
+    return next.add(cur);
+};
+
+GameManager.prototype.divable = function (next, cur) {
+  return next.mod(cur) || cur.mod(next);
 };
 
 // Do the factor extraction in the way yielding the least result
 GameManager.prototype.extractPrimesFrom = function(n, i) {
   if (i >= this.tileTypes.length) return n;
   var min = this.extractPrimesFrom(n, i+1);
-  while (n % this.tileTypes[i] == 0) {
-    n /= this.tileTypes[i];
+  while (n.mod(this.tileTypes[i])) {
+    n = n.divide(this.tileTypes[i]);
     var comparandum = this.extractPrimesFrom(n, i+1);
-    if (comparandum < min)
+    if (Math.abs(comparandum.value[0]) + Math.abs(comparandum.value[1]) * 2 < Math.abs(min.value[0]) + Math.abs(min.value[1]) * 2)
       min = comparandum;
   }
   return min;
 }
 
 GameManager.prototype.extractNewPrimes = function (n) {
+  if (n.number() === 0) {
+    return [];
+  }
   n = this.extractPrimesFrom(n, 0);
-  if (n > 1)
+  n = new Value(Math.round(n.value[0]), Math.round(n.value[1]));
+  if (n.number() !== 0 && n.number() !== Infinity && !(new Value(1, 0).mod(n))) {
     return [n];
+  }
   return [];
 };
 
@@ -336,7 +345,7 @@ GameManager.prototype.tileMatchesAvailable = function () {
 
           var other  = self.grid.cellContent(cell);
 
-          if (other && self.div(other.value, tile.value) > 0) {
+          if (other && self.divable(other.value, tile.value)) {
             return true; // These two tiles can be merged
           }
         }

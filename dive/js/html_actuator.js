@@ -13,6 +13,16 @@ function HTMLActuator() {
     131, 137, 139, 149, 151, 157, 163, 167, 173, 179, 181, 191, 193, 197,
     199, 211, 223, 227, 229, 233, 239, 241, 251, 257, 263, 269, 271, 277,
     281, 283, 293, 307, 311, 313, 317, 331, 337, 347, 349, 353, 359, 367];
+  
+  this.overlayPrimes2 = [new Value(3, 1), new Value(5, 1), new Value(7, 3),
+    new Value(7, 2), new Value(7, 1), new Value(11, 5), new Value(9, 2),
+    new Value(9, 1), new Value(11, 4), new Value(13, 6), new Value(11, 3),
+    new Value(11, 2), new Value(15, 7), new Value(13, 4), new Value(13, 3),
+    new Value(13, 1), new Value(17, 7), new Value(15, 4), new Value(19, 9),
+    new Value(15, 1), new Value(19, 8), new Value(17, 5), new Value(21, 10),
+    new Value(17, 4), new Value(19, 7), new Value(17, 3), new Value(17, 2),
+    new Value(19, 5), new Value(21, 8), new Value(25, 12), new Value(19, 2),
+    new Value(19, 1), new Value(23, 9)];
 }
 
 HTMLActuator.prototype.actuate = function (grid, metadata) {
@@ -65,8 +75,13 @@ HTMLActuator.prototype.createTile = function (tile, animate) {
   var position  = tile.previousPosition || { x: tile.x, y: tile.y };
   positionClass = this.positionClass(position);
 
+  var tileValueWithout2 = tile.value;
+  while (tileValueWithout2.mod(2) && !tileValueWithout2.equals(0)) {
+    tileValueWithout2 = tileValueWithout2.divide(2);
+  }
+
   // We can't use classlist because it somehow glitches when replacing classes
-  var classes = ["tile", "tile-" + gcd(tile.value, 1296000)];
+  var classes = ["tile", "tile-" + gcd(gcd(tile.value.value[0], tile.value.value[1]), 1296000) + (tileValueWithout2.mod(new Value(0,1)) ? "sq2" : "")];
   var animatedClasses = [];
 
   classes.push(positionClass);
@@ -98,8 +113,9 @@ HTMLActuator.prototype.createTile = function (tile, animate) {
   var tileNumber = document.createElement("div");
   var tileNumberClasses = animatedClasses.slice(0);
   tileNumberClasses.push("tilenumber");
-  var contentLength = String(tile.value).length;
+  var contentLength = String(tile.value.toString()).length;
   if (contentLength > 2) {
+    contentLength = contentLength + 1;
     if (contentLength > 6) {
       contentLength = 6;
     }
@@ -109,12 +125,40 @@ HTMLActuator.prototype.createTile = function (tile, animate) {
   tileNumber.textContent = tile.value;
   element.appendChild(tileNumber);
 
-  this.overlayPrimes.forEach(function (p) {
-    if (tile.value % p == 0) {
+  
+  this.overlayPrimes2.forEach(function (p) {
+    if (tile.value.mod(p)) {
       var tileOverlay = document.createElement("div");
       var tileOverlayClasses = animatedClasses.slice(0);
       tileOverlayClasses.push("tileoverlay");
-      if (tile.value % (p*p) == 0)
+      var psq = p.mul(p)
+      if (tile.value.mod(psq))
+        tileOverlayClasses.push("tileoverlay-" + psq.value[0] + "p" + psq.value[1] + "sq2");
+      else
+        tileOverlayClasses.push("tileoverlay-" + p.value[0] + "p" + p.value[1] + "sq2");
+      self.applyClasses(tileOverlay, tileOverlayClasses);
+      element.appendChild(tileOverlay);
+    }
+    p = new Value(p.value[0], -p.value[1]);
+    if (tile.value.mod(p)) {
+      var tileOverlay = document.createElement("div");
+      var tileOverlayClasses = animatedClasses.slice(0);
+      tileOverlayClasses.push("tileoverlay");
+      var psq = p.mul(p)
+      if (tile.value.mod(psq))
+        tileOverlayClasses.push("tileoverlay-" + psq.value[0] + "m" + Math.abs(psq.value[1]) + "sq2");
+      else
+        tileOverlayClasses.push("tileoverlay-" + p.value[0] + "m" + Math.abs(p.value[1]) + "sq2");
+      self.applyClasses(tileOverlay, tileOverlayClasses);
+      element.appendChild(tileOverlay);
+    }
+  });
+  this.overlayPrimes.forEach(function (p) {
+    if (tile.value.mod(p)) {
+      var tileOverlay = document.createElement("div");
+      var tileOverlayClasses = animatedClasses.slice(0);
+      tileOverlayClasses.push("tileoverlay");
+      if (tile.value.mod(p*p))
         tileOverlayClasses.push("tileoverlay-" + (p*p));
       else
         tileOverlayClasses.push("tileoverlay-" + p);
@@ -199,16 +243,16 @@ HTMLActuator.prototype.message = function (game_over_data) {
   
   if ("tilesSeen" in game_over_data) {
     var seen = game_over_data.tilesSeen;
-    seen.sort(function (a,b){return a-b});
+    seen.sort(function (a,b){return a.number()-b.number()});
     for (var i = seen.length - 2; i >= 0; i--)
-      if (seen[i] == seen[i+1])
+      if (seen[i].equals(seen[i+1]))
         seen.splice(i,1);
 
     this.clearContainer(this.currentlyUnlocked);
 
     for (var i = 0; i < seen.length; i++) {
         var seenElem = this.createMiniTile(seen[i]);
-        if (game_over_data.tileTypes.indexOf(seen[i]) == -1) {
+        if (game_over_data.tileTypes.findIndex(x => seen[i].equals(x)) == -1) {
             seenElem.classList.add('ghost');
         }
         this.currentlyUnlocked.appendChild(seenElem);
