@@ -14,7 +14,7 @@ function HTMLActuator() {
     199, 211, 223, 227, 229, 233, 239, 241, 251, 257, 263, 269, 271, 277,
     281, 283, 293, 307, 311, 313, 317, 331, 337, 347, 349, 353, 359, 367];
   
-  this.overlayPrimes2 = [new Value(3, 1), new Value(5, 1), new Value(7, 3),
+  this.overlayPrimes2 = [new Value(3, 1), new Value(5, 2), new Value(5, 1), new Value(7, 3),
     new Value(7, 2), new Value(7, 1), new Value(11, 5), new Value(9, 2),
     new Value(9, 1), new Value(11, 4), new Value(13, 6), new Value(11, 3),
     new Value(11, 2), new Value(15, 7), new Value(13, 4), new Value(13, 3),
