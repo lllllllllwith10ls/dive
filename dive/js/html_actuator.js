@@ -81,7 +81,7 @@ HTMLActuator.prototype.createTile = function (tile, animate) {
   }
 
   // We can't use classlist because it somehow glitches when replacing classes
-  var classes = ["tile", "tile-" + gcd(gcd(tile.value.value[0], tile.value.value[1]), 1296000) + (tileValueWithout2.mod(new Value(0,1)) ? "sq2" : "")];
+  var classes = ["tile", "tile-" + gcd(gcd(Math.abs(tile.value.value[0]), Math.abs(tile.value.value[1])), 1296000) + (tileValueWithout2.mod(new Value(0,1)) ? "sq2" : "")];
   var animatedClasses = [];
 
   classes.push(positionClass);
